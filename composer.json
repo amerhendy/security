@@ -1,8 +1,6 @@
 {
     "name": "amerhendy/security",
-    "type": "library",
     "license": "mit",
-	"version": "0.0.1",
     "autoload": {
         "psr-4": {
             "Amerhendy\\Security\\": "src/"
