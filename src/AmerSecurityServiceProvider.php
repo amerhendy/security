@@ -6,7 +6,8 @@ use Amerhendy\Employment\App\Helpers\Library\AmerPanel\AmerPanel;
 use Amerhendy\Employment\App\Helpers\Library\AmerPanel\AmerPanelFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Routing\Router;
-use Illuminate\Support\Collection;  
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
@@ -14,13 +15,15 @@ use Amerhendy\Security\app\Http\Middleware\ThrottlePasswordRecovery;
 use Laravel\Passport\Http\Middleware\CheckClientCredentials;
 class AmerSecurityServiceProvider extends ServiceProvider
 {
+    use \Amerhendy\Amer\App\Helpers\Library\Database\PublishesMigrations;
     public $startcomm="SEC";
     protected $commands = [];
     protected $defer = false;
-    public $pachaPath="Amerhendy\Security\\";
+    public static $pachaPath="Amerhendy\Security\\";
+    public static $config;
     public function register(): void
     {
-        require_once __DIR__.'/macro.php';   
+        require_once __DIR__.'/macro.php';
     }
 
     /**
@@ -28,69 +31,40 @@ class AmerSecurityServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $path=base_path('vendor/AmerHendy/Security/src/');
         $this->loadConfigs();
+        self::$config=Config('Amer.Security');
+        if(Config('Amer.Security.package_path')){
+            self::$pachaPath=cleanDir(Config('Amer.Security.package_path'));
+        }else{
+            self::$pachaPath=cleanDir(__DIR__);
+        }
+        $this->loadViewsFrom(cleanDir([self::$pachaPath,'view']), 'SEC');
+        $this->loadTranslationsFrom(cleanDir([self::$pachaPath,"lang"]), 'SECLANG');
+        $this->registerMigrations(cleanDir([self::$pachaPath,"database",'migrations']));
         $this->publishFiles();
-        $this->loadMigrationsFrom($path.'database/migrations');
-        $this->loadroutes($this->app->router);
-        $this->loadTranslationsFrom(__DIR__.'/Lang','SECLANG');
-        $this->loadViewsFrom($path.'/view', 'SEC');
         $this->loadGuards();
         $this->registerMiddlewareGroup($this->app->router);
-        
+        $this->loadroutes($this->app->router);
     }
     public function loadConfigs(){
-        foreach(getallfiles(__DIR__.'/config/') as $file){
-            $this->mergeConfigFrom($file,Str::replace('/','.',Str::afterLast(Str::remove('.php',$file),'config/')),'securityconfig');
-        }
-    }
-    public function loadroutes(Router $router)
-    {
-        $packagepath=base_path('vendor/AmerHendy/Security/src/');
-        $routepath=$this->getallfiles($packagepath.'/Route/');
-        foreach($routepath as $path){
-            $this->loadRoutesFrom($path);
-        }
-    }
-    public function getLastLineNumberThatContains($needle, $haystack,$skipcomment=false)
-    {
-        $matchingLines = array_filter($haystack, function ($k) use ($needle,$skipcomment) {
-            if($skipcomment == true){
-                if(!Str::startsWith(trim($k),'//')){
-                    return strpos($k, $needle) !== false;
-                }
+        foreach(getallfiles(__DIR__.'/config') as $file){
+            if(!Str::contains($file, 'config'.DIRECTORY_SEPARATOR."Amer".DIRECTORY_SEPARATOR)){
+                $name=Str::afterLast(Str::remove('.php',$file),'config'.DIRECTORY_SEPARATOR);
             }else{
-                    return strpos($k, $needle) !== false;
+                $name='Amer.'.ucfirst(Str::afterLast(Str::remove('.php',$file),'config'.DIRECTORY_SEPARATOR."Amer".DIRECTORY_SEPARATOR));
             }
-            
-        });
-        if ($matchingLines) { 
-            return array_key_last($matchingLines);
-        }
 
-        return false;
-    }   
-    function getallfiles($path){
-        $files = array_diff(scandir($path), array('.', '..'));
-        $out=[];
-        foreach($files as $a=>$b){
-            if(is_dir($path."/".$b)){
-                $out=array_merge($out,getallfiles($path."/".$b));
-            }else{
-                $ab=Str::after($path,'/vendor');
-                $ab=Str::replace('//','/',$ab);
-                $ab=Str::finish($ab,'/');
-                $out[]=$ab.$b;
-            }
+            $this->mergeConfigFrom(
+                $file,$name
+            );
         }
-        return $out;
     }
     function publishFiles()  {
-        $pb=config('Amer.Security.package_path') ?? __DIR__;
-        $config_files = [$pb.'/config' => config_path()];
+        $config_files = [cleanDir([self::$pachaPath,'config']).DIRECTORY_SEPARATOR.'permission.php' => config_path()];
         $this->publishes($config_files, $this->startcomm.':SecConfig');
+        $public_assets = [cleanDir([self::$pachaPath,'public']) => config('Amer.Amer.public_path')];
+        $this->publishes($public_assets, $this->startcomm.':public');
     }
-    
     public function loadGuards(){
         $b=config('Amer.Security.auth');
         $name=$b['middleware_key'];
@@ -110,7 +84,7 @@ class AmerSecurityServiceProvider extends ServiceProvider
                     ],
                 ];
         //////////////////////// publish Amer Guard/////////////////////////
-        
+
         app()->config['auth.passwords'] = app()->config['auth.passwords'] +
         [
             'Amer' => [
@@ -153,5 +127,27 @@ class AmerSecurityServiceProvider extends ServiceProvider
                 $router->aliasMiddleware(config('Amer.Security.auth.middleware_key').'.throttle.password.recovery', ThrottlePasswordRecovery::class);
             }
             app('router')->aliasMiddleware('client', CheckClientCredentials::class);
+    }
+    public function loadroutes(Router $router)
+    {
+        $routepath=getallfiles(cleanDir([self::$pachaPath,'route']));
+        foreach($routepath as $path){
+            if(!\Str::contains($path, 'api.php')){
+                $this->loadRoutesFrom($path);
+            }else{
+                Route::group($this->apirouteConfiguration(), function () use($packagepath){
+                    $this->loadRoutesFrom($path);
+                });
+            }
+        }
+    }
+    protected function apirouteConfiguration()
+    {
+        return [
+            'prefix' =>'api/'.config('Amer.Amer.api_version')??'v1',
+            'middleware' => 'client',
+            'name'=>(config('Amer.Security.routeName_prefix') ?? 'amer').'Api',
+            'namespace'  =>config('Amer.Security.Controllers','\\Amerhendy\Security\App\Http\Controllers\\'),
+        ];
     }
 }

@@ -19,10 +19,11 @@
                 action='minus';
             }
             div=$('i[data-int='+id+']').parent();
-            
+
             jQuery.ajax({
                 url:"{{url('Security/Teams/fetch/AddUsers')}}",
                 data:{TeamId,id,action},
+				type:'post',
             }).done(function(data){
                 $('i[data-int='+id+']').attr('class','fa fa-'+data[0]);
                 $(div).attr('onclick',"adduserToTeam("+TeamId+","+id+",'"+data[0]+"')");
@@ -38,6 +39,7 @@ function sendSecRequestToGetAll(Type,RoleId,URL,DATA,DivId,ResultFn,fstText,ndTe
     jQuery.ajax({
         url:URL,
         data:DATA,
+        type:'post',
     }).done(function(data){
         var allData=data[1];
         var selectedDataIds=data[0]

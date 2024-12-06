@@ -1,127 +1,26 @@
-<a href="javascript:void(0)" onclick="addRolesPerms(this)" data-entry="{{$entry->getKey()}}" data-mdb-ripple-duration="0s" class="btn btn-sm btn-success" data-button-type="addRolesPerms"><i class="fa fa-lock"></i></a>
-@push('after_scripts') @if (request()->ajax()) @endpush @endif
+<a
+    href="javascript:void(0)"
+    onclick="addToRoleBTN(this,'{{trans('SECLANG::permissionmanager.permission_plural')}}','{{url('Security/role/fetch/Perms')}}')"
+    data-entry="{{$entry->getKey()}}"
+    data-mdb-ripple-duration="0s"
+    class="btn btn-sm btn-success"
+    data-buttontype="addRolesPerms"
+    data-ModalId="addRolesPerms"
+    data-ResultFn="addRolesPerms"
+    data-ModelKey="RoleId"
+    data-addLink="{{url('Security/role/fetch/AddPerms')}}"
+    data-title="0"
+>
+    <i class="fa fa-lock"></i>
+</a>
+@push('after_scripts')
+<?php
+?>
+@if (request()->ajax()) @endpush @endif
+@loadScriptOnce('js/Security/roles.js')
 @loadOnce('addRolesPerms')
 <script>
-    if (typeof addRolesPerms != 'function') {
-        $("[data-button-type=addRolesPerms]").unbind('click');
-        function addRolesPerms(button){
-            var RoleId=$(button).data('entry')
-            var type='all';
-            var ModalId='addRolesPerms';
-            var ResultFn='addPermToRole';
-            createModal(button,ModalId,"{{trans('SECLANG::permissionmanager.permission_plural')}}");
-            sendSecRequestToGetAll('all',RoleId,"{{url('Security/role/fetch/Perms')}}",{type,RoleId},ModalId,ResultFn,'name');
-        }
-    }
-    function addPermToRole(RoleId,id,action){
-            if(action == 'minus'){
-                action='plus';
-            }else{
-                action='minus';
-            }
-            div=$('i[data-int='+id+']').parent();
-            
-            jQuery.ajax({
-                url:"{{url('Security/role/fetch/AddPerms')}}",
-                data:{RoleId,id,action},
-            }).done(function(data){
-                $('i[data-int='+id+']').attr('class','fa fa-'+data[0]);
-                $(div).attr('onclick',"addPermToRole("+RoleId+","+id+",'"+data[0]+"')");
-            });
-        }
-</script>
-@endLoadOnce
-@loadOnce('sendSecRequestToGetAll')
-<script>
-function sendSecRequestToGetAll(Type,RoleId,URL,DATA,DivId,ResultFn,fstText,ndText=null){
-    var ndText=ndText;
-    jQuery.ajax({
-        url:URL,
-        data:DATA,
-    }).done(function(data){
-        var allData=data[1];
-        var selectedDataIds=data[0]
-        var divFst=$(`<div class="row"></div>`);
-        var col=$(`<div class="mb-3"><label class="form-label" for="search">search</label></div>`);
-        var SearchInput=$(`<input type="text" id="filterlist" class="form-control search" name="search" placeholder="Name">`);
-        col.append(SearchInput);
-        divFst.append(col)
-        var divFstListGroup=$(`<ul class="list-group list-group-flush"></ul>`);
-        $.each(allData,function(k,v){
-            var DataId=v['id'];
-            if(in_array(selectedDataIds,DataId)){var plus='minus';}else{var plus='plus';}
-            if(ndText == null){var Second='';}else{var Second=v[ndText];}
-            var fstDivInnerText=`<li class="list-group-item d-flex justify-content-between align-items-start">
-                                    <div class="ms-2 me-auto">
-                                        <div class="fw-bold">`+v[fstText]+`</div>
-                                        `+Second+`
-                                    </div>
-                                    <span class="badge bg-primary rounded-circle" onclick="`+ResultFn+`(`+RoleId+`,`+v['id']+`,'`+plus+`')">
-                                        <i class="fa fa-`+plus+`" data-int="`+v['id']+`"></i>
-                                    </span>
-                                </li>`;
-            var fstDivInner=$(fstDivInnerText);
-            divFstListGroup.append(fstDivInner);
-        });
-        divFst.append(divFstListGroup);
-        $('#'+DivId+'Modal .modal-dialog .modal-content .modal-body').html(divFst);
-        $(SearchInput).on('input',function(e){searchModal(e.target);})
-    });
-}
-</script>
-@endLoadOnce
-@loadOnce('searchModal')
-<script>
-    function searchModal(input){
-        var value=$(input).val();
-        //list all vals
-        var row=$(input).parent().parent();
-        var rowchilds=$(row).children();
-        var ul=rowchilds[1];
-        var li=$(ul).children();
-        $.each(li,function(k,v){
-            var licontent=$(v).children()[0];
-            var liName=$(licontent).children()[0];
-            var Name=licontent.innerText;
-            if(Name.includes(value) === false){
-                $(v).attr('style','display:none !important');
-            }else{
-                $(v).attr('style','');
-            }
-        });
-    }
-</script>
-@endLoadOnce
-@loadOnce('CreateModal')
-<script>
-    function createModal(button,id,title){
-            fst=$(button).parent().parent().children()[0];
-            fst=$(fst).children()[0];
-            fst=$(fst).html();
-            fst=fst.toString().replace(/^\s+|\s+$/g, "");
-            var myModal=$(`<div class="modal fade" id="` + id + `Modal" tabindex="-1" aria-labelledby="`+id+`ModalLabel" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-fullscreen-xxl-down">
-                <div class="modal-content">
-                <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="`+id+`ModalLabel">`+title+` : `+fst+`</h1>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-                </div>
-            </div>
-            </div>`);
-            //lunch show modal
-            if($(`#`+id+`Modal`).length == 0){$('body').append(myModal);}
-            var myModalEl = document.querySelector(`#`+id+`Modal`)
-            var modal = bootstrap.Modal.getOrCreateInstance(myModalEl) // Returns a Bootstrap modal instance
-            modal.show()
-    }
+    const addPermToRoleLink="{{url('Security/role/fetch/AddPerms')}}";
 </script>
 @endLoadOnce
 @if (!request()->ajax()) @endpush @endif

@@ -1,11 +1,10 @@
 <?php
 use Illuminate\Support\Facades\Route;
 ////////////////////////////////////UI///////////////////////////////////////////////
-
 Route::group(
     [
         'namespace' => config('Amer.Security.Controllers'),
-        'middleware' =>array_merge((array) config('Amer.amer.web_middleware'),(array) config('Amer.Security.auth.middleware_key')),
+        'middleware' =>array_merge((array) config('Amer.Amer.web_middleware'),(array) config('Amer.Security.auth.middleware_key')),
         'prefix'=>config('Amer.Security.route_prefix','Security'),
         'name'=>config('Amer.Security.routeName_prefix','Security'),
     ],
@@ -25,7 +24,7 @@ Route::group(
 Route::group(
     [
         'namespace' => config('Amer.Security.Controllers'),
-        'middleware' => config('Amer.amer.web_middleware', 'web'),
+        'middleware' => config('Amer.Amer.web_middleware', 'web'),
         'prefix'=>config('Amer.Security.route_prefix','amer'),
         'name'=>config('Amer.Security.routeName_prefix','Security'),
     ],function(){
@@ -36,7 +35,7 @@ Route::group(
 Route::group(
     [
         'namespace' => config('Amer.Security.Controllers'),
-        'middleware' => config('Amer.amer.web_middleware', 'web'),
+        'middleware' => config('Amer.Amer.web_middleware', 'web'),
         'prefix'=>config('Amer.Security.route_prefix','amer'),
         'name'=>config('Amer.Security.routeName_prefix','Security'),
     ],function(){
@@ -51,10 +50,10 @@ Route::group(['namespace' => config('Amer.Security.Controllers'), 'prefix' => 'a
 Route::group(
     [
         'namespace' => config('Amer.Security.Controllers'),
-        'middleware' => config('Amer.amer.web_middleware', 'web'),
+        'middleware' => config('Amer.Amer.web_middleware', 'web'),
         'prefix'=>config('Amer.Security.route_prefix','amer'),
         'name'=>config('Amer.Security.routeName_prefix','Security'),
     ],function(){
-        
+        Route::post('setcollPerms','\Amerhendy\Security\App\Http\Controllers\PermissionAmerController@newPermissions');
     }
 );

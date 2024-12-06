@@ -3,7 +3,7 @@ namespace Amerhendy\Security\App\Http\Controllers;
 use Amerhendy\Amer\App\Http\Controllers\Base\AmerController;
 use Amerhendy\Security\App\Http\Requests\RoleStoreAmerRequest as StoreRequest;
 use Amerhendy\Security\App\Http\Requests\RoleUpdateAmerRequest as UpdateRequest;
-
+use Illuminate\Http\Request;
 // VALIDATION
 
 class RoleAmerController extends AmerController
@@ -16,21 +16,21 @@ class RoleAmerController extends AmerController
 
     public function setup()
     {
-        $this->role_model = $role_model = config('Amer.permissionmanager.models.role');
-        $this->permission_model = $permission_model = config('Amer.permissionmanager.models.permission');
+        $this->role_model = $role_model = config('Amer.Permissionmanager.models.role');
+        $this->permission_model = $permission_model = config('Amer.Permissionmanager.models.permission');
         $this->Amer->setModel($role_model);
         $this->Amer->setEntityNameStrings(trans('SECLANG::permissionmanager.role'), trans('SECLANG::permissionmanager.roles'));
         $this->Amer->addButton('line', 'btnRolesAddpermission','view', 'SEC::.admin.btn-roles-addPermession', 'beginning');
         $this->Amer->addButton('line', 'btnaddRolesUsers','view', 'SEC::.admin.btn-roles-addRolesUsers', 'beginning');
         $this->Amer->setRoute(Sec_url('role'));
         // deny access according to configuration file
-        if (config('Amer.permissionmanager.allow_role_create') == false) {
+        if (config('Amer.Permissionmanager.allow_role_create') == false) {
             $this->Amer->denyAccess('create');
         }
-        if (config('Amer.permissionmanager.allow_role_update') == false) {
+        if (config('Amer.Permissionmanager.allow_role_update') == false) {
             $this->Amer->denyAccess('update');
         }
-        if (config('Amer.permissionmanager.allow_role_delete') == false) {
+        if (config('Amer.Permissionmanager.allow_role_delete') == false) {
             $this->Amer->denyAccess('delete');
         }
     }
@@ -65,7 +65,7 @@ class RoleAmerController extends AmerController
         /**
          * In case multiple guards are used, show a column for the guard.
          */
-        
+
         if (config('permissionmanager.multiple_guards')) {
             $this->Amer->addColumn([
                 'name'  => 'guard_name',
@@ -156,18 +156,19 @@ class RoleAmerController extends AmerController
         }
         return $returnable;
     }
-    public function fetchPerms()
+    public function fetchPerms(Request $request)
     {
-        if(!isset($_GET['RoleId'])){$id=null;}else{$id=$_GET['RoleId'];}
-        if(is_null($id)){return [];}
-        $rolePerms=\DB::table('role_has_permissions')->where(['role_id'=>$id])->get('permission_id');
+        if($request->has('RoleId')){$id=$request->input('RoleId');}else{return [];}
+        $rolePerms=\DB::table(config('permission.table_names.role_has_permissions') ?? 'role_has_permissions')
+        ->where(['role_id'=>$id])
+        ->get('permission_id');
         $selectedPermissions=[];
         if(count($rolePerms)){
             foreach ($rolePerms as $key => $value) {
                 $selectedPermissions[]=$value->permission_id;
             }
         }
-        $permission_model = config('Amer.permissionmanager.models.permission');
+        $permission_model = config('Amer.Permissionmanager.models.permission');
         $permission_model = $permission_model::get();
         $allperms=[];
         foreach($permission_model as $key => $value) {
@@ -177,10 +178,11 @@ class RoleAmerController extends AmerController
         }
         return [$selectedPermissions,$allperms];
     }
-    public function fetchUsers()
+    public function fetchUsers(Request $request)
     {
-        if(!isset($_GET['RoleId'])){$id=null;}else{$id=$_GET['RoleId'];}
-        if(is_null($id)){return [];}
+        if(!$request->has('RoleId')){return [];}
+        if($request->input("RoleId") == ''){return [];}
+        $id=$request->input("RoleId");
         $roleUsers=\DB::table('model_has_roles')->where(['role_id'=>$id])->get('model_id');
         $selectedusers=[];
         if(count($roleUsers)){
@@ -198,43 +200,70 @@ class RoleAmerController extends AmerController
         }
         return [$selectedusers,$allUsers];
     }
-    public function fetchAddPerms()
+    public function fetchAddPerms(Request $request)
     {
-        //RoleId,id,action
-        if(!isset($_GET['RoleId'])){return[];}else{$RoleId=$_GET['RoleId'];}
-        if(!isset($_GET['id'])){return[];}else{$id=$_GET['id'];}
-        if(isset($_GET['action'])){
-            $action=$_GET['action'];
-        }else{
-            $action=null;
+        if(!$request->has('RoleId')){return [];}else{$RoleId=$request->input('RoleId');}
+        if(!$request->has('id')){return [];}else{$id=$request->input('id');}
+        if(!$request->has('action')){return null;}else{$action=$request->input('action');}
+        $RoleId=$request->input("RoleId");
+        $id=$request->input("id");
+        $action=$request->input("action");
+        $sert=[];
+        if(!is_array($id)){$id=[$id];}
+        $user=\DB::table(config('permission.table_names.role_has_permissions') ?? 'role_has_permissions')->where('role_id',$RoleId)->whereIn('permission_id',$id)->get();
+        if($action === 'minus'){
+            $user=\DB::table(config('permission.table_names.role_has_permissions') ?? 'role_has_permissions')->where('role_id',$RoleId)->whereIn('permission_id',$id)->delete();
+            return $id;
+        }elseif($action === 'plus'){
+            $vc=[];
+            foreach ($user as $key => $value) {
+                if(in_array($value->permission_id,$id)){
+                    $vc[]=\AmerHelper::getkeyByValue($id,$value->permission_id);
+                }
+            }
+            foreach ($vc as $v) {
+                unset($id[$v]);
+            }
+            if(empty($id)){return [];}
+            foreach ($id as $key => $value) {
+                \DB::table(config('permission.table_names.role_has_permissions') ?? 'role_has_permissions')->insert(['role_id' => $RoleId,'permission_id' => $value]);
+                $sert[]=$value;
+            }
+            return $sert;
         }
-        $user=\DB::table('role_has_permissions')->where(['role_id'=>$RoleId,'permission_id'=>$id])->first();
-        if(!$user){
-                \DB::table('role_has_permissions')->insert(['role_id' => $RoleId,'permission_id' => $id]);
-                return ['minus'];
-        }else{
-                \DB::table('role_has_permissions')->where(['role_id'=>$RoleId,'permission_id'=>$id])->delete();
-            return ['plus'];
-        }
-        return $user->id;
     }
-    public function fetchAddUsers()
+    public function fetchAddUsers(Request $request)
     {
-        //RoleId,id,action
-        if(!isset($_GET['RoleId'])){return[];}else{$RoleId=$_GET['RoleId'];}
-        if(!isset($_GET['id'])){return[];}else{$id=$_GET['id'];}
-        if(isset($_GET['action'])){
-            $action=$_GET['action'];
-        }else{
-            $action=null;
-        }
-        $user=\DB::table('model_has_roles')->where(['role_id'=>$RoleId,'model_id'=>$id])->first();
-        if(!$user){
-                \DB::table('model_has_roles')->insert(['role_id' => $RoleId,'model_id' => $id,'model_type'=>'Amerhendy\Security\App\Models\User']);
-                return ['minus'];
-        }else{
-                \DB::table('model_has_roles')->where(['role_id'=>$RoleId,'model_id'=>$id])->delete();
-            return ['plus'];
+
+        if(!$request->has('RoleId')){return [];}
+        if(!$request->has('id')){return [];}
+        if(!$request->has('action')){return [];}
+        $RoleId=$request->input("RoleId");
+        $id=$request->input("id");
+        $action=$request->input("action");
+        $sert=[];
+        if(!is_array($id)){$id=[$id];}
+        $user=\DB::table('model_has_roles')->where('role_id',$RoleId)->whereIn('model_id',$id)->get();
+        if($action === 'minus'){
+            $user=\DB::table('model_has_roles')->where('role_id',$RoleId)->whereIn('model_id',$id)->delete();
+            return $id;
+            //remove
+        }elseif($action === 'plus'){
+            $vc=[];
+            foreach ($user as $key => $value) {
+                if(in_array($value->model_id,$id)){
+                    $vc[]=\AmerHelper::getkeyByValue($id,$value->model_id);
+                }
+            }
+            foreach ($vc as $v) {
+                unset($id[$v]);
+            }
+            if(empty($id)){return [];}
+            foreach ($id as $key => $value) {
+                $user=\DB::table('model_has_roles')->insert(['role_id' => $RoleId,'model_id' => $value,'model_type'=>'Amerhendy\Security\App\Models\User']);
+                $sert[]=$value;
+            }
+            return $sert;
         }
     }
 }

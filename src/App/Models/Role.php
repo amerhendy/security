@@ -14,15 +14,16 @@ use Amerhendy\Amer\App\Models\Traits\AmerTrait;
 use Spatie\Permission\Models\Role as OriginalRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class Role extends Model
 {
     use AmerTrait;
     use HasPermissions;
     use RefreshesPermissionCache;
-    use SoftDeletes;
+    use SoftDeletes,HasUuids;
     protected $fillable = ['name', 'ArName', 'guard_name', 'sort', 'updated_at', 'created_at'];
     protected $guarded = ['id'];
-    public $incrementing=true;
+    public $incrementing=false;
     public function __construct(array $attributes = [])
     {
         $attributes['guard_name'] = $attributes['guard_name'] ?? config('auth.defaults.guard');

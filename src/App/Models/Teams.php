@@ -8,13 +8,14 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Model;
 use Amerhendy\Amer\App\Models\Traits\AmerTrait;
 use Amerhendy\Security\App\Models\Role;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class Teams extends Model
 {
-    use HasFactory,SoftDeletes,AmerTrait;
+    use HasFactory,SoftDeletes,AmerTrait,HasUuids;
     protected $table ="teams";
     protected $guarded = ['id'];
     protected $primaryKey = 'id';
-    public $incrementing = true;
+    public $incrementing = false;
     public $timestamps = true;
     protected $dates = ['deleted_at'];
     public static $list=[];

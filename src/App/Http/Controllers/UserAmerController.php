@@ -1,6 +1,7 @@
 <?php
 namespace Amerhendy\Security\App\Http\Controllers;
-use Amerhendy\Amer\App\Http\Controllers\Base\AmerController;
+use \Amerhendy\Amer\App\Http\Controllers\Base\AmerController;
+use \Amerhendy\Amer\App\Helpers\Library\AmerPanel\AmerPanelFacade as AMER;
 use \Amerhendy\Security\App\Models\Teams;
 use \Amerhendy\Security\App\Models\Role;
 use Amerhendy\Security\App\Http\Requests\PermissionStoreAmerRequest as StoreRequest;
@@ -8,8 +9,10 @@ use Amerhendy\Security\App\Http\Requests\PermissionUpdateAmerRequest as UpdateRe
 use Illuminate\Support\Facades\Hash;
 use App\Models\User as Model;
 use App\Models\Role as RoleModel;
+use Illuminate\Support\Facades\Validator;
 class UserAmerController extends AmerController
 {
+    public static $error,$returnType;
     use \Amerhendy\Amer\App\Http\Controllers\Base\Operations\ListOperation;
     use \Amerhendy\Amer\App\Http\Controllers\Base\Operations\CreateOperation { store as traitStore; }
     use \Amerhendy\Amer\App\Http\Controllers\Base\Operations\UpdateOperation { update as traitUpdate; }
@@ -18,6 +21,7 @@ class UserAmerController extends AmerController
 
     public function setup()
     {
+
         $this->Amer->setModel(\Amerhendy\Security\App\Models\User::class);
         $this->Amer->setEntityNameStrings(trans('SECLANG::permissionmanager.user'), trans('SECLANG::permissionmanager.users'));
         $this->Amer->setRoute(Sec_url('user'));
@@ -51,7 +55,7 @@ class UserAmerController extends AmerController
                 'name'      => 'roles', // the method that defines the relationship in your Model
                 'entity'    => 'roles', // the method that defines the relationship in your Model
                 'attribute' => 'ArName', // foreign key attribute that is shown to user
-                'model'     => config('permissionmanager.models.role'), // foreign key model
+                'model'     => config('Permissionmanager.models.role'), // foreign key model
             ],
             [ // n-n relationship (with pivot table)
                 'label'     => trans('SECLANG::permissionmanager.extra_permissions'), // Table column heading
@@ -59,7 +63,7 @@ class UserAmerController extends AmerController
                 'name'      => 'permissions', // the method that defines the relationship in your Model
                 'entity'    => 'permissions', // the method that defines the relationship in your Model
                 'attribute' => 'name', // foreign key attribute that is shown to user
-                'model'     => config('permission.models.permission'), // foreign key model
+                'model'     => config('Permission.models.permission'), // foreign key model
             ],
         ]);
         // Role Filter
@@ -69,7 +73,7 @@ class UserAmerController extends AmerController
                 'type'  => 'dropdown',
                 'label' => trans('SECLANG::permissionmanager.role'),
             ],
-            config('Amer.permissionmanager.models.role')::all()->pluck('name', 'id')->toArray(),
+            config('Amer.Permissionmanager.models.role')::all()->pluck('name', 'id')->toArray(),
             function ($value) { // if the filter is active
                 $this->Amer->addClause('whereHas', 'roles', function ($query) use ($value) {
                     $query->where('role_id', '=', $value);
@@ -103,6 +107,12 @@ class UserAmerController extends AmerController
     {
         $this->Amer->addFields([
             [
+                'name'  => 'title',
+                'label' => trans('SECLANG::user.prefix'),
+                'type'  => 'select2_from_array',
+                'options'=>trans('SECLANG::user.prefixs')
+            ],
+            [
                 'name'  => 'name',
                 'label' => trans('SECLANG::permissionmanager.name'),
                 'type'  => 'text',
@@ -113,10 +123,6 @@ class UserAmerController extends AmerController
             ],[
                 'name'  => 'last_name',
                 'label' => trans('SECLANG::permissionmanager.last_name'),
-                'type'  => 'text',
-            ],[
-                'name'  => 'title',
-                'label' => trans('SECLANG::permissionmanager.title'),
                 'type'  => 'text',
             ],[
                 'name'  => 'mobile',
@@ -139,10 +145,10 @@ class UserAmerController extends AmerController
      */
     public function store()
     {
+        $this->Amer->model->fillable[]='password';
         $this->Amer->setRequest($this->Amer->validateRequest());
         $this->Amer->setRequest($this->handlePasswordInput($this->Amer->getRequest()));
         $this->Amer->unsetValidation(); // validation has already been run
-
         return $this->traitStore();
     }
 
@@ -184,11 +190,14 @@ class UserAmerController extends AmerController
 
     protected function addUserFields()
     {
+        $Model=config('Amer.Permissionmanager.models.role');
+        $routes=$this->Amer->routelist;
         $this->Amer->addFields([
             [
-                'name'  => 'name',
-                'label' => trans('SECLANG::permissionmanager.name'),
-                'type'  => 'text',
+                'name'  => 'title',
+                'label' => trans('SECLANG::user.prefix'),
+                'type'  => 'select2_from_array',
+                'options'=>trans('SECLANG::user.prefixs')
             ],[
                 'name'  => 'first_name',
                 'label' => trans('SECLANG::permissionmanager.first_name'),
@@ -196,10 +205,6 @@ class UserAmerController extends AmerController
             ],[
                 'name'  => 'last_name',
                 'label' => trans('SECLANG::permissionmanager.last_name'),
-                'type'  => 'text',
-            ],[
-                'name'  => 'title',
-                'label' => trans('SECLANG::permissionmanager.title'),
                 'type'  => 'text',
             ],[
                 'name'  => 'mobile',
@@ -210,6 +215,11 @@ class UserAmerController extends AmerController
                 'name'  => 'email',
                 'label' => trans('SECLANG::permissionmanager.email'),
                 'type'  => 'email',
+            ],
+            [
+                'name'  => 'name',
+                'label' => trans('SECLANG::permissionmanager.name'),
+                'type'  => 'text',
             ],
             [
                 'name'  => 'password',
@@ -223,10 +233,25 @@ class UserAmerController extends AmerController
             ]
         ]);
     }
+    public static function SutupErros(){
+        self::$error=new \stdClass();
+        self::$error->number=401;
+        self::$error->page=\Str::between(\Str::after(__FILE__,__DIR__),'\\','.php');
+        if(request()->ajax()){self::$returnType='json';}else{self::$returnType='html';}
+    }
     public function fetchRoles()
     {
-        if(!isset($_GET['UserId'])){$id=null;}else{$id=$_GET['UserId'];}
-        if(is_null($id)){return [];}
+        self::SutupErros();
+        $request=request();
+        $validator=Validator::make($request->all(),[
+            'type'=>'required',
+            'UserId'=>'required',
+        ]);
+        if($validator->fails()){
+            self::$error->message=$validator->messages();self::$error->line=__LINE__;
+                return \AmerHelper::responseError(self::$error,self::$error->number);
+        }
+        $id=$request->input('UserId');
         $roleUsers=\DB::table('model_has_roles')->where(['model_id'=>$id])->get('role_id');
         $selectedRoles=[];
         if(count($roleUsers)){
@@ -234,7 +259,7 @@ class UserAmerController extends AmerController
                 $selectedRoles[]=$value->role_id;
             }
         }
-        $role_model = config('Amer.permissionmanager.models.role');
+        $role_model = config('Amer.Permissionmanager.models.role');
         $role_model = $role_model::get();
         $allRoles=[];
         foreach($role_model as $key => $value) {
@@ -246,14 +271,20 @@ class UserAmerController extends AmerController
     }
     public function fetchAddRoles()
     {
-        //UserId,id,action
-        if(!isset($_GET['UserId'])){return[];}else{$UserId=$_GET['UserId'];}
-        if(!isset($_GET['id'])){return[];}else{$id=$_GET['id'];}
-        if(isset($_GET['action'])){
-            $action=$_GET['action'];
-        }else{
-            $action=null;
+        self::SutupErros();
+        $request=request();
+        $validator=Validator::make($request->all(),[
+            'id'=>'required',
+            'UserId'=>'required',
+            'action'=>'required',
+        ]);
+        if($validator->fails()){
+            self::$error->message=$validator->messages();self::$error->line=__LINE__;
+                return \AmerHelper::responseError(self::$error,self::$error->number);
         }
+        $id=$request->input('id');
+        $UserId=$request->input('UserId');
+        $action=$request->input('action');
         $user=\DB::table('model_has_roles')->where(['role_id'=>$id,'model_id'=>$UserId])->first();
         if(!$user){
                 \DB::table('model_has_roles')->insert(['role_id' => $id,'model_id' => $UserId,'model_type'=>'Amerhendy\Security\App\Models\User']);
@@ -265,9 +296,18 @@ class UserAmerController extends AmerController
     }
     public function fetchPerms()
     {
-        if(!isset($_GET['UserId'])){$userId=null;}else{$userId=$_GET['UserId'];}
-        if(is_null($userId)){return [];}
-        $model_has_roles=\DB::table('model_has_roles')->where(['model_id'=>$userId])->get('role_id');
+        self::SutupErros();
+        $request=request();
+        $validator=Validator::make($request->all(),[
+            'type'=>'required',
+            'UserId'=>'required',
+        ]);
+        if($validator->fails()){
+            self::$error->message=$validator->messages();self::$error->line=__LINE__;
+                return \AmerHelper::responseError(self::$error,self::$error->number);
+        }
+        $UserId=$request->input('UserId');
+        $model_has_roles=\DB::table('model_has_roles')->where(['model_id'=>$UserId])->get('role_id');
         $selectedRoles=[];
         if(count($model_has_roles)){
             foreach ($model_has_roles as $key => $value) {
@@ -282,14 +322,14 @@ class UserAmerController extends AmerController
             }
         }
         ///////get user permissions/////
-        $model_has_permissions=\DB::table('model_has_permissions')->where('model_id',$userId)->get('permission_id');
+        $model_has_permissions=\DB::table('model_has_permissions')->where('model_id',$UserId)->get('permission_id');
         if(count($model_has_permissions)){
             foreach ($model_has_permissions as $key => $value) {
                 $selectedPermissions[]=$value->permission_id;
             }
         }
         $selectedPermissions=array_unique($selectedPermissions);
-        $permission_model = config('Amer.permissionmanager.models.permission');
+        $permission_model = config('Amer.Permissionmanager.models.permission');
         $permission_model = $permission_model::get();
         $allPermissions=[];
         foreach($permission_model as $key => $value) {
@@ -301,10 +341,20 @@ class UserAmerController extends AmerController
     }
     public function fetchAddPers()
     {
-        //UserId,id,action
-        if(!isset($_GET['UserId'])){return[];}else{$UserId=$_GET['UserId'];}
-        if(!isset($_GET['id'])){return[];}else{$id=$_GET['id'];}
-        if(isset($_GET['action'])){$action=$_GET['action'];}else{$action=null;}
+        self::SutupErros();
+        $request=request();
+        $validator=Validator::make($request->all(),[
+            'id'=>'required',
+            'UserId'=>'required',
+            'action'=>'required',
+        ]);
+        if($validator->fails()){
+            self::$error->message=$validator->messages();self::$error->line=__LINE__;
+                return \AmerHelper::responseError(self::$error,self::$error->number);
+        }
+        $id=$request->input('id');
+        $UserId=$request->input('UserId');
+        $action=$request->input('action');
         $user=\DB::table('model_has_permissions')->where(['permission_id'=>$id,'model_id'=>$UserId])->first();
         if(!$user){
                 \DB::table('model_has_permissions')->insert(['permission_id' => $id,'model_id' => $UserId,'model_type'=>'Amerhendy\Security\App\Models\User']);

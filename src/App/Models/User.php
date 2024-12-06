@@ -10,18 +10,19 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
 use Amerhendy\Amer\App\Models\Traits\AmerTrait;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class User extends Authenticatable
 {
-    use HasApiTokens,HasFactory,AmerTrait, Notifiable;
+    use HasApiTokens,HasFactory,AmerTrait, Notifiable,HasUuids;
     use HasRoles; // <------ and this
     use HasPermissions;
-
+    protected $keyType = 'string';
     /**
      * The attributes that are mass assignable.
      *
      * @var array
      */
-    protected $fillable=['name','email','first_name','last_name','title','mobile'];
+    public $fillable=['name','email','first_name','last_name','title','mobile'];
 
     /**
      * The attributes that should be hidden for arrays.
@@ -42,12 +43,36 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
     public function canper($text){
-    $AllPermissions=amer_user()->getAllPermissions()->toArray();
-    foreach($AllPermissions as $a=>$b) {
-        if($text == $b['name']){
-            return true;
+        //list rolesPers
+        $UserId=amer_user()->id;
+        $roleUsers=\DB::table('model_has_roles')->where(['model_id'=>$UserId])->get('role_id');
+        $selectedRoles=[];
+        if(count($roleUsers)){
+            foreach ($roleUsers as $key => $value) {
+                $selectedRoles[]=$value->role_id;
+            }
         }
-    }
+        $role_has_permissions=\DB::table('role_has_permissions')->whereIn('role_id',$selectedRoles)->get('permission_id');
+        $selectedPermissions=[];
+        if(count($role_has_permissions)){
+            foreach ($role_has_permissions as $key => $value) {
+                $selectedPermissions[]=$value->permission_id;
+            }
+        }
+        $model_has_permissions=\DB::table('model_has_permissions')->where('model_id',$UserId)->get('permission_id');
+        if(count($model_has_permissions)){
+            foreach ($model_has_permissions as $key => $value) {
+                $selectedPermissions[]=$value->permission_id;
+            }
+        }
+        $selectedPermissions=array_unique($selectedPermissions);
+        $permission_model = config('Amer.Permissionmanager.models.permission');
+        $permission_model = $permission_model::whereIn('id',$selectedPermissions)->get('name')->toArray();
+        foreach ($permission_model as $key => $value) {
+            if($value['name']=$text){
+                return true;
+            }
+        }
         return false;
     }
     public function getsort(){
